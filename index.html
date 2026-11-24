@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GitHub 新兴飙升开源榜</title>
+  <style>
+    :root { --bg: #0d1117; --card: #161b22; --border: #30363d; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); padding: 24px 16px; }
+    .container { max-width: 960px; margin: 0 auto; }
+    header { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; }
+    h1 { font-size: 24px; }
+    .updated { font-size: 13px; color: var(--muted); }
+    .controls { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; align-items: center; }
+    .tabs { display: flex; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 4px; }
+    .tab { border: none; background: transparent; color: var(--muted); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; }
+    .tab.active { background: #238636; color: #fff; }
+    input, select { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: 8px; font-size: 14px; outline: none; }
+    input { flex: 1; min-width: 180px; }
+    .list { display: flex; flex-direction: column; gap: 12px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; display: flex; gap: 16px; align-items: flex-start; transition: border-color .2s; }
+    .card:hover { border-color: var(--accent); }
+    .rank { font-size: 18px; font-weight: 700; color: var(--muted); min-width: 28px; text-align: center; padding-top: 2px; }
+    .rank.top3 { color: #f0883e; }
+    .avatar { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--border); flex-shrink: 0; }
+    .info { flex: 1; min-width: 0; }
+    .title { font-size: 16px; font-weight: 600; color: var(--accent); text-decoration: none; word-break: break-all; }
+    .title:hover { text-decoration: underline; }
+    .desc { font-size: 14px; color: var(--muted); margin: 6px 0 10px; line-height: 1.5; }
+    .meta { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); align-items: center; }
+    .tag { background: #1f2937; color: #79c0ff; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+    .empty { text-align: center; color: var(--muted); padding: 48px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🚀 GitHub 新兴飙升开源榜</h1>
+      <div class="updated" id="updated">加载中...</div>
+    </header>
+
+    <div class="controls">
+      <div class="tabs">
+        <button class="tab active" data-key="weekly">近 7 天飙升</button>
+        <button class="tab" data-key="monthly">近 30 天飙升</button>
+      </div>
+      <select id="langFilter"><option value="">全部语言</option></select>
+      <input type="text" id="search" placeholder="搜索项目名、简介或标签..." />
+    </div>
+
+    <div class="list" id="list"></div>
+  </div>
+
+  <script>
+    let rawData = null;
+    let currentKey = "weekly";
+
+    const esc = (s) => String(s).replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+
+    function updateLangOptions() {
+      const select = document.getElementById("langFilter");
+      const langs = [...new Set(rawData[currentKey].map((r) => r.language))].sort();
+      select.innerHTML = '<option value="">全部语言</option>' + langs.map((l) => `<option value="${esc(l)}">${esc(l)}</option>`).join("");
+    }
+
+    function render() {
+      if (!rawData) return;
+      const lang = document.getElementById("langFilter").value;
+      const kw = document.getElementById("search").value.trim().toLowerCase();
+      const items = rawData[currentKey].filter((r) => {
+        if (lang && r.language !== lang) return false;
+        if (kw && !`${r.full_name} ${r.description} ${r.topics.join(" ")}`.toLowerCase().includes(kw)) return false;
+        return true;
+      });
+
+      const listEl = document.getElementById("list");
+      if (!items.length) {
+        listEl.innerHTML = '<div class="empty">没有匹配的项目</div>';
+        return;
+      }
+
+      listEl.innerHTML = items.map((r, i) => `
+        <div class="card">
+          <div class="rank ${i < 3 ? "top3" : ""}">${i + 1}</div>
+          <img class="avatar" src="${esc(r.avatar)}" alt="" loading="lazy" />
+          <div class="info">
+            <a class="title" href="${esc(r.html_url)}" target="_blank" rel="noopener">${esc(r.full_name)}</a>
+            <div class="desc">${esc(r.description)}</div>
+            <div class="meta">
+              <span>⭐ ${r.stars.toLocaleString()}</span>
+              <span>🍴 ${r.forks.toLocaleString()}</span>
+              <span>💻 ${esc(r.language)}</span>
+              <span>📅 ${esc(r.created_at)}</span>
+              ${r.topics.map((t) => `<span class="tag">#${esc(t)}</span>`).join("")}
+            </div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    document.querySelectorAll(".tab").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentKey = btn.dataset.key;
+        updateLangOptions();
+        render();
+      });
+    });
+
+    document.getElementById("langFilter").addEventListener("change", render);
+    document.getElementById("search").addEventListener("input", render);
+
+    fetch("./data.json")
+      .then((r) => r.json())
+      .then((data) => {
+        rawData = data;
+        document.getElementById("updated").textContent = "最后更新：" + new Date(data.updated_at).toLocaleString("zh-CN");
+        updateLangOptions();
+        render();
+      })
+      .catch(() => {
+        document.getElementById("list").innerHTML = '<div class="empty">暂未找到 data.json，请先在 GitHub Actions 运行一次抓取任务。</div>';
+      });
+  </script>
+</body>
+</html>
